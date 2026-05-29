@@ -1,280 +1,240 @@
+﻿'use strict';
+
+// â”€â”€ ConfiguraÃ§Ã£o da API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// API_BASE Ã© definido em index.html (compartilhado com os outros mÃ³dulos)
+const API_LIVROS  = `${API_BASE}/livros`;
+const API_AUTORES = `${API_BASE}/autores`;
+
 let livros = [];
 let editandoId = null;
 
-// ── Elementos do DOM ─────────────────────────────────────────────
-const formLivro = document.getElementById('form-livro');
-const tabelaBody = document.querySelector('#lista tbody');
-const campoId = document.getElementById('livro-id');
-const campoTitulo = document.getElementById('titulo');
-const campoAutor = document.getElementById('autor');
-const campoISBN = document.getElementById('isbn');
-const campoAno = document.getElementById('ano');
+// â”€â”€ Elementos do DOM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const formLivro       = document.getElementById('form-livro');
+const tabelaBody      = document.querySelector('#lista tbody');
+const campoId         = document.getElementById('livro-id');
+const campoTitulo     = document.getElementById('titulo');
+const campoAutorId    = document.getElementById('autor-id');
+const campoISBN       = document.getElementById('isbn');
+const campoAno        = document.getElementById('ano');
 const campoDisponivel = document.getElementById('disponivel');
 
-// ── Inicialização ────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  carregarDados();
-  renderizarLista();
-  
-  // Event Listeners
+document.addEventListener('DOMContentLoaded', async () => {
+  await Promise.all([carregarLivros(), popularSelectAutores()]);
+
   formLivro.addEventListener('submit', handleSubmit);
   formLivro.addEventListener('reset', handleReset);
+
+  [campoTitulo, campoAutorId, campoISBN, campoAno, campoDisponivel].forEach(input => {
+    input.addEventListener('input', function () {
+      this.classList.remove('is-invalid');
+      const err = this.parentElement.querySelector('.error-message');
+      if (err) err.remove();
+    });
+  });
 });
 
-// ── Carregar dados do localStorage ──────────────────────────────
-function carregarDados() {
-  const dadosSalvos = localStorage.getItem('bibliotecario_livros');
-  
-  if (dadosSalvos) {
-    livros = JSON.parse(dadosSalvos);
-  } else {
-    livros = [
-      {
-        id: 1,
-        titulo: 'Dom Casmurro',
-        autor: 'Machado de Assis',
-        isbn: '978-85-359-0277-5',
-        ano: 1899,
-        disponivel: true
-      },
-      {
-        id: 2,
-        titulo: 'O Senhor dos Anéis',
-        autor: 'J.R.R. Tolkien',
-        isbn: '978-85-333-0235-9',
-        ano: 1954,
-        disponivel: false
-      },
-      {
-        id: 3,
-        titulo: 'Clean Code',
-        autor: 'Robert C. Martin',
-        isbn: '978-85-7608-539-2',
-        ano: 2008,
-        disponivel: true
-      }
-    ];
-    salvarDados();
+async function popularSelectAutores(selecionarId = null) {
+  try {
+    const resp = await fetch(API_AUTORES);
+    const json = await resp.json();
+    if (json.status !== 'ok') return;
+
+    const valorAtual = selecionarId ?? campoAutorId.value;
+    campoAutorId.innerHTML = '<option value="" disabled selected>Selecione</option>';
+    json.data.forEach(autor => {
+      const opt = document.createElement('option');
+      opt.value = autor.id;
+      opt.textContent = autor.nome;
+      campoAutorId.appendChild(opt);
+    });
+    if (valorAtual) campoAutorId.value = valorAtual;
+  } catch { /* silencia â€” select fica vazio */ }
+}
+
+async function carregarLivros() {
+  try {
+    const resp = await fetch(API_LIVROS);
+    const json = await resp.json();
+    if (json.status === 'ok') {
+      livros = json.data;
+      renderizarLista();
+    } else {
+      mostrarMensagem('Erro ao carregar livros: ' + json.mensagem, 'danger');
+    }
+  } catch {
+    mostrarMensagem('Falha ao conectar com a API. Verifique se o servidor estÃ¡ rodando na porta 3000.', 'danger');
   }
 }
 
-// ── Salvar dados no localStorage ────────────────────────────────
-function salvarDados() {
-  localStorage.setItem('bibliotecario_livros', JSON.stringify(livros));
-}
-
-// ── Renderizar lista de livros ──────────────────────────────────
 function renderizarLista() {
   tabelaBody.innerHTML = '';
-  
+
   if (livros.length === 0) {
     tabelaBody.innerHTML = `
       <tr>
         <td colspan="7" class="text-center text-muted py-4">
-          Nenhum livro cadastrado. Use o formulário abaixo para adicionar.
+          Nenhum livro cadastrado. Use o formulÃ¡rio abaixo para adicionar.
         </td>
-      </tr>
-    `;
+      </tr>`;
     return;
   }
-  
-  // Renderizar cada livro
+
   livros.forEach((livro, index) => {
     const tr = document.createElement('tr');
-    
-    const badgeClass = livro.disponivel ? 'badge-disponivel' : 'badge-indisponivel';
-    const disponivelTexto = livro.disponivel ? 'Sim' : 'Não';
-    
+    const badgeClass      = livro.disponivel ? 'badge-disponivel' : 'badge-indisponivel';
+    const disponivelTexto = livro.disponivel ? 'Sim' : 'NÃ£o';
+
     tr.innerHTML = `
       <td>${index + 1}</td>
-      <td>${livro.titulo}</td>
-      <td>${livro.autor}</td>
-      <td>${livro.isbn}</td>
-      <td>${livro.ano}</td>
+      <td>${escapeHtml(livro.titulo)}</td>
+      <td>${escapeHtml(livro.autor_nome ?? '-')}</td>
+      <td>${escapeHtml(livro.isbn ?? '-')}</td>
+      <td>${livro.ano ?? '-'}</td>
       <td><span class="badge rounded-pill ${badgeClass}">${disponivelTexto}</span></td>
       <td>
-        <button class="btn-acao btn-editar" onclick="editarLivro(${livro.id})">Editar</button>
-        <button class="btn-acao btn-excluir" onclick="excluirLivro(${livro.id})">Excluir</button>
-      </td>
-    `;
-    
+        <button class="btn-acao btn-editar"  data-id="${livro.id}">Editar</button>
+        <button class="btn-acao btn-excluir" data-id="${livro.id}">Excluir</button>
+      </td>`;
+
+    tr.querySelector('.btn-editar').addEventListener('click',  () => editarLivro(livro.id));
+    tr.querySelector('.btn-excluir').addEventListener('click', () => excluirLivro(livro.id));
     tabelaBody.appendChild(tr);
   });
 }
 
-// ── Handler do submit do formulário ─────────────────────────────
-function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
-  if (!validarFormulario()) {
-    return;
-  }
+  if (!validarFormulario()) return;
 
-  const dadosLivro = {
-    titulo: campoTitulo.value.trim(),
-    autor: campoAutor.value.trim(),
-    isbn: campoISBN.value.trim(),
-    ano: parseInt(campoAno.value),
-    disponivel: campoDisponivel.value === '1'
+  const dados = {
+    titulo:     campoTitulo.value.trim(),
+    autor_id:   Number(campoAutorId.value),
+    isbn:       campoISBN.value.trim() || null,
+    ano:        campoAno.value ? Number(campoAno.value) : null,
+    disponivel: Number(campoDisponivel.value),
   };
-  
-  if (editandoId) {
-    atualizarLivro(editandoId, dadosLivro);
-  } else {
-    adicionarLivro(dadosLivro);
+
+  try {
+    const url = editandoId ? `${API_LIVROS}?id=${editandoId}` : API_LIVROS;
+    const msg = editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!';
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dados),
+    });
+    const json = await resp.json();
+
+    if (json.status === 'ok') {
+      mostrarMensagem(msg, 'success');
+      formLivro.reset();
+      await carregarLivros();
+    } else {
+      mostrarMensagem('Erro: ' + json.mensagem, 'danger');
+    }
+  } catch {
+    mostrarMensagem('Falha ao conectar com a API.', 'danger');
   }
-  
-  formLivro.reset();
-  renderizarLista();
-  
-  mostrarMensagem(editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!', 'success');
 }
 
-// ── Validar formulário ──────────────────────────────────────────
 function validarFormulario() {
   const campos = [
-    { elemento: campoTitulo, nome: 'Título' },
-    { elemento: campoAutor, nome: 'Autor' },
-    { elemento: campoISBN, nome: 'ISBN' },
-    { elemento: campoAno, nome: 'Ano' },
-    { elemento: campoDisponivel, nome: 'Disponível' }
+    { elemento: campoTitulo,     nome: 'TÃ­tulo' },
+    { elemento: campoAutorId,    nome: 'Autor' },
+    { elemento: campoDisponivel, nome: 'DisponÃ­vel' },
   ];
-  
-  document.querySelectorAll('.error-message').forEach(el => el.remove());
-  document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
-  
+
+  document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
+  document.querySelectorAll('#form-livro .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
   let valido = true;
-  
   for (const campo of campos) {
-    if (!campo.elemento.value.trim()) {
+    if (!campo.elemento.value) {
       campo.elemento.classList.add('is-invalid');
-      
-      const errorMsg = document.createElement('div');
-      errorMsg.className = 'error-message text-danger small mt-1';
-      errorMsg.textContent = `${campo.nome} é obrigatório.`;
-      campo.elemento.parentElement.appendChild(errorMsg);
-      
+      const err = document.createElement('div');
+      err.className = 'error-message text-danger small mt-1';
+      err.textContent = `${campo.nome} Ã© obrigatÃ³rio.`;
+      campo.elemento.parentElement.appendChild(err);
       valido = false;
     }
   }
-  
-  const ano = parseInt(campoAno.value);
+
+  const ano = Number(campoAno.value);
   if (campoAno.value && (ano < 1000 || ano > 2099)) {
     campoAno.classList.add('is-invalid');
-    const errorMsg = document.createElement('div');
-    errorMsg.className = 'error-message text-danger small mt-1';
-    errorMsg.textContent = 'Ano deve estar entre 1000 e 2099.';
-    campoAno.parentElement.appendChild(errorMsg);
+    const err = document.createElement('div');
+    err.className = 'error-message text-danger small mt-1';
+    err.textContent = 'Ano deve estar entre 1000 e 2099.';
+    campoAno.parentElement.appendChild(err);
     valido = false;
   }
-  
+
   return valido;
 }
 
-// ── Adicionar novo livro ────────────────────────────────────────
-function adicionarLivro(dadosLivro) {
-  const novoLivro = {
-    id: Date.now(),
-    ...dadosLivro
-  };
-  
-  livros.push(novoLivro);
-  salvarDados();
-}
-
-// ── Atualizar livro existente ───────────────────────────────────
-function atualizarLivro(id, dadosLivro) {
-  const index = livros.findIndex(livro => livro.id === id);
-  
-  if (index !== -1) {
-    livros[index] = {
-      id: id,
-      ...dadosLivro
-    };
-    salvarDados();
-  }
-}
-
-// ── Editar livro ────────────────────────────────────────────────
-function editarLivro(id) {
+async function editarLivro(id) {
   const livro = livros.find(l => l.id === id);
-  
   if (!livro) return;
-  
-  // Preencher formulário
-  campoId.value = livro.id;
-  campoTitulo.value = livro.titulo;
-  campoAutor.value = livro.autor;
-  campoISBN.value = livro.isbn;
-  campoAno.value = livro.ano;
+
+  campoId.value         = livro.id;
+  campoTitulo.value     = livro.titulo;
+  campoISBN.value       = livro.isbn ?? '';
+  campoAno.value        = livro.ano ?? '';
   campoDisponivel.value = livro.disponivel ? '1' : '0';
-  
+
+  await popularSelectAutores(livro.autor_id);
+
   editandoId = id;
-  
   document.getElementById('cadastro').scrollIntoView({ behavior: 'smooth' });
   campoTitulo.focus();
-    mostrarMensagem('Editando livro. Modifique os campos e clique em Salvar.', 'info');
+  mostrarMensagem('Editando livro. Modifique os campos e clique em Salvar.', 'info');
 }
 
-// ── Excluir livro ───────────────────────────────────────────────
-function excluirLivro(id) {
+async function excluirLivro(id) {
   const livro = livros.find(l => l.id === id);
-  
   if (!livro) return;
-  
-  if (!confirm(`Deseja realmente excluir o livro "${livro.titulo}"?`)) {
-    return;
+  if (!confirm(`Deseja realmente excluir o livro "${livro.titulo}"?`)) return;
+
+  try {
+    const resp = await fetch(`${API_LIVROS}?id=${id}&acao=excluir`);
+    const json = await resp.json();
+    if (json.status === 'ok') {
+      mostrarMensagem('Livro excluÃ­do com sucesso!', 'success');
+      await carregarLivros();
+    } else {
+      mostrarMensagem('Erro: ' + json.mensagem, 'danger');
+    }
+  } catch {
+    mostrarMensagem('Falha ao conectar com a API.', 'danger');
   }
-  
-  livros = livros.filter(l => l.id !== id);
-  salvarDados();
-  renderizarLista();
-  
-  mostrarMensagem('Livro excluído com sucesso!', 'danger');
 }
 
-// ── Handler do reset do formulário ──────────────────────────────
 function handleReset() {
   editandoId = null;
   campoId.value = '';
-  
-  document.querySelectorAll('.error-message').forEach(el => el.remove());
-  document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
+  document.querySelectorAll('#form-livro .is-invalid').forEach(el => el.classList.remove('is-invalid'));
 }
 
-// ── Mostrar mensagem de feedback ────────────────────────────────
 function mostrarMensagem(texto, tipo = 'success') {
-  const mensagemAnterior = document.getElementById('feedback-message');
-  if (mensagemAnterior) {
-    mensagemAnterior.remove();
-  }
-  
-  const mensagem = document.createElement('div');
-  mensagem.id = 'feedback-message';
-  mensagem.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
-  mensagem.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-  mensagem.innerHTML = `
-    ${texto}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  `;
-  
-  document.body.appendChild(mensagem);
-  
-  setTimeout(() => {
-    mensagem.remove();
-  }, 5000);
+  const anterior = document.getElementById('feedback-message');
+  if (anterior) anterior.remove();
+
+  const msg = document.createElement('div');
+  msg.id = 'feedback-message';
+  msg.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
+  msg.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+  msg.innerHTML = `
+    ${escapeHtml(texto)}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+
+  document.body.appendChild(msg);
+  setTimeout(() => msg.remove(), 5000);
 }
 
-// ── Remover classes de validação ao digitar ─────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const inputs = [campoTitulo, campoAutor, campoISBN, campoAno, campoDisponivel];
-  
-  inputs.forEach(input => {
-    input.addEventListener('input', function() {
-      this.classList.remove('is-invalid');
-      const errorMsg = this.parentElement.querySelector('.error-message');
-      if (errorMsg) {
-        errorMsg.remove();
-      }
-    });
-  });
-});
+function escapeHtml(texto) {
+  const div = document.createElement('div');
+  div.textContent = String(texto);
+  return div.innerHTML;
+}
+
