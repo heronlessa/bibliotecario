@@ -1,4 +1,5 @@
-import { Response } from 'express';
+import { Response, Request, NextFunction, RequestHandler } from 'express';
+import { AppError } from '../errors/AppError';
 
 //Sucesso
 export const ok = (res: Response, data: unknown, mensagem: string) =>
@@ -29,3 +30,23 @@ export const erroNegocio = (res: Response, mensagem: string) =>
 //Erro servidor
 export const erroServidor = (res: Response, e: unknown) =>
   res.status(500).json({ status: 'erro', mensagem: String(e), data: null });
+
+// ── Wrapper para controllers ──────────────────────────────────────
+// Captura AppError e erros inesperados num único lugar,
+// eliminando try/catch repetido em cada método do controller.
+export function handleController(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+): RequestHandler {
+  return (req, res, next) => {
+    fn(req, res, next).catch((err: unknown) => {
+      if (err instanceof AppError) {
+        return res.status(err.statusCode).json({
+          status: 'erro',
+          mensagem: err.mensagem,
+          data: null,
+        });
+      }
+      return erroServidor(res, err);
+    });
+  };
+}

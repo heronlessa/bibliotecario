@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { erroNaoAutenticado, erroServidor } from '../helpers/resposta';
 
@@ -16,25 +16,25 @@ declare global {
   }
 }
 
-export function autenticar(req: Request, res: Response, next: NextFunction) {
+export function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return erroNaoAutenticado(res);
   }
 
-  const token   = authHeader.split(' ')[1];
-  const segredo = process.env.JWT_SECRET;
+  const token  = authHeader.split(' ')[1];
+  const secret = process.env.JWT_SECRET;
 
-  if (!segredo) {
-    return erroServidor(res, 'Configuração de segurança ausente no servidor.');
+  if (!secret) {
+    return erroServidor(res, 'Configuracao de seguranca ausente no servidor.');
   }
 
   try {
-    const payload = jwt.verify(token, segredo) as TokenPayload;
+    const payload = jwt.verify(token, secret) as TokenPayload;
     req.usuario = payload;
     next();
   } catch {
-    return erroNaoAutenticado(res, 'Sessão expirada ou inválida. Faça login novamente.');
+    return erroNaoAutenticado(res, 'Sessao expirada ou invalida. Faca login novamente.');
   }
 }
