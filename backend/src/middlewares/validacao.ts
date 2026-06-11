@@ -8,7 +8,6 @@ export function validarLogin(req: Request, res: Response, next: NextFunction) {
   if (!email?.trim())                               return erro(res, 'E-mail é obrigatório.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))  return erro(res, 'E-mail inválido.');
   if (!senha)                                       return erro(res, 'Senha é obrigatória.');
-  if (senha.length < 6)                             return erro(res, 'Senha deve ter no mínimo 6 caracteres.');
   next();
 }
 

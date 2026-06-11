@@ -4,11 +4,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { validarLogin } from '../middlewares/validacao';
+import { ok, erroNaoAutenticado, erroServidor } from '../helpers/resposta';
 
 const router = Router();
-
-const ok   = (res: Response, data: unknown, msg: string) => res.json({ status: 'ok',   mensagem: msg, data });
-const erro = (res: Response, msg: string, code = 400)    => res.status(code).json({ status: 'erro', mensagem: msg, data: null });
 
 // POST /api/auth/login
 router.post('/login', validarLogin, async (req: Request, res: Response) => {
@@ -20,14 +18,14 @@ router.post('/login', validarLogin, async (req: Request, res: Response) => {
       [email.trim()]
     );
 
-    if (!rows.length) return erro(res, 'E-mail ou senha inválidos.', 401);
+    if (!rows.length) return erroNaoAutenticado(res, 'E-mail ou senha inválidos.');
 
     const usuario = rows[0];
     const senhaOk = await bcrypt.compare(senha, usuario.senha);
-    if (!senhaOk) return erro(res, 'E-mail ou senha inválidos.', 401);
+    if (!senhaOk) return erroNaoAutenticado(res, 'E-mail ou senha inválidos.');
 
     const segredo = process.env.JWT_SECRET;
-    if (!segredo) return erro(res, 'Configuração de segurança ausente no servidor.', 500);
+    if (!segredo) return erroServidor(res, 'Configuração de segurança ausente no servidor.');
 
     const token = jwt.sign(
       { id: usuario.id, nome: usuario.nome, email: usuario.email },
@@ -36,10 +34,10 @@ router.post('/login', validarLogin, async (req: Request, res: Response) => {
     );
 
     return ok(res, { token, usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email } }, 'Login realizado com sucesso.');
-  } catch (e) { return erro(res, String(e), 500); }
+  } catch (e) { return erroServidor(res, e); }
 });
 
-// POST /api/auth/logout  (apenas sinalização — o token é descartado pelo front)
+// POST /api/auth/logout
 router.post('/logout', (_req: Request, res: Response) => {
   return ok(res, null, 'Logout realizado.');
 });

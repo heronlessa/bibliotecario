@@ -3,13 +3,11 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import pool from '../config/database';
 import { autenticar } from '../middlewares/sessao';
 import { validarLivro } from '../middlewares/validacao';
+import { ok, criado, erroNaoEncontrado, erroServidor } from '../helpers/resposta';
 
 const router = Router();
 
-const ok   = (res: Response, data: unknown, msg: string) => res.json({ status: 'ok',   mensagem: msg, data });
-const erro = (res: Response, msg: string, code = 400)    => res.status(code).json({ status: 'erro', mensagem: msg, data: null });
-
-// GET /api/livros 
+// GET /api/livros
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(`
@@ -20,10 +18,10 @@ router.get('/', async (_req: Request, res: Response) => {
        ORDER BY l.id ASC
     `);
     return ok(res, rows.map(r => ({ ...r, disponivel: Boolean(r.disponivel) })), 'Livros carregados.');
-  } catch (e) { return erro(res, String(e), 500); }
+  } catch (e) { return erroServidor(res, e); }
 });
 
-// GET /api/livros/:id 
+// GET /api/livros/:id
 router.get('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
   try {
@@ -33,12 +31,12 @@ router.get('/:id', async (req: Request, res: Response) => {
         JOIN autores a ON l.autor_id = a.id
        WHERE l.id = ? AND l.ativo = 1
     `, [id]);
-    if (!rows.length) return erro(res, 'Livro não encontrado.', 404);
+    if (!rows.length) return erroNaoEncontrado(res, 'Livro não encontrado.');
     return ok(res, { ...rows[0], disponivel: Boolean(rows[0].disponivel) }, 'Livro encontrado.');
-  } catch (e) { return erro(res, String(e), 500); }
+  } catch (e) { return erroServidor(res, e); }
 });
 
-// POST /api/livros 
+// POST /api/livros
 router.post('/', autenticar, validarLivro, async (req: Request, res: Response) => {
   const { titulo, autor_id, isbn, ano, disponivel } = req.body as {
     titulo: string; autor_id: number; isbn?: string; ano?: number; disponivel?: number;
@@ -48,11 +46,11 @@ router.post('/', autenticar, validarLivro, async (req: Request, res: Response) =
       'INSERT INTO livros (titulo, autor_id, isbn, ano, disponivel) VALUES (?, ?, ?, ?, ?)',
       [titulo.trim(), autor_id, isbn?.trim() || null, ano || null, disponivel ?? 1]
     );
-    return ok(res, { id: result.insertId }, 'Livro cadastrado com sucesso.');
-  } catch (e) { return erro(res, String(e), 500); }
+    return criado(res, { id: result.insertId }, 'Livro cadastrado com sucesso.');
+  } catch (e) { return erroServidor(res, e); }
 });
 
-// PUT /api/livros/:id 
+// PUT /api/livros/:id
 router.put('/:id', autenticar, validarLivro, async (req: Request, res: Response) => {
   const { id } = req.params;
   const { titulo, autor_id, isbn, ano, disponivel } = req.body as {
@@ -63,9 +61,9 @@ router.put('/:id', autenticar, validarLivro, async (req: Request, res: Response)
       'UPDATE livros SET titulo = ?, autor_id = ?, isbn = ?, ano = ?, disponivel = ? WHERE id = ? AND ativo = 1',
       [titulo.trim(), autor_id, isbn?.trim() || null, ano || null, disponivel ?? 1, id]
     );
-    if (!result.affectedRows) return erro(res, 'Livro não encontrado.', 404);
+    if (!result.affectedRows) return erroNaoEncontrado(res, 'Livro não encontrado.');
     return ok(res, null, 'Livro atualizado com sucesso.');
-  } catch (e) { return erro(res, String(e), 500); }
+  } catch (e) { return erroServidor(res, e); }
 });
 
 // DELETE /api/livros/:id
@@ -75,9 +73,9 @@ router.delete('/:id', autenticar, async (req: Request, res: Response) => {
     const [result] = await pool.execute<ResultSetHeader>(
       'UPDATE livros SET ativo = 0 WHERE id = ?', [id]
     );
-    if (!result.affectedRows) return erro(res, 'Livro não encontrado.', 404);
+    if (!result.affectedRows) return erroNaoEncontrado(res, 'Livro não encontrado.');
     return ok(res, null, 'Livro excluído com sucesso.');
-  } catch (e) { return erro(res, String(e), 500); }
+  } catch (e) { return erroServidor(res, e); }
 });
 
 export default router;
