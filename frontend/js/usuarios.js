@@ -1,6 +1,6 @@
 ﻿'use strict';
 
-const API_USUARIOS_URL = `${API_BASE}/usuarios`;
+const API_USUARIOS = '/usuarios';
 
 let usuarios = [];
 let editandoUsuarioId = null;
@@ -14,29 +14,24 @@ const campoSenha     = document.getElementById('usuario-senha');
 const labelSenha     = document.querySelector('label[for="usuario-senha"]');
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (!exigirAutenticacao()) return;
+
   await carregarUsuarios();
 
   formUsuario.addEventListener('submit', handleSubmitUsuario);
   formUsuario.addEventListener('reset',  handleResetUsuario);
-
-  [campoNome, campoEmail, campoSenha].forEach(input => {
-    input.addEventListener('input', function () {
-      this.classList.remove('is-invalid');
-      const err = this.parentElement.querySelector('.error-message');
-      if (err) err.remove();
-    });
-  });
+  registrarLimpezaErro([campoNome, campoEmail, campoSenha]);
 });
 
 async function carregarUsuarios() {
   try {
-    const resp = await fetch(API_USUARIOS_URL);
-    const json = await resp.json();
+    const { json } = await apiFetch(API_USUARIOS);
     if (json.status === 'ok') {
       usuarios = json.data;
       renderizarUsuarios();
+      if (typeof popularSelectUsuarios === 'function') popularSelectUsuarios();
     } else {
-      mostrarMensagem('Erro ao carregar usuÃ¡rios: ' + json.mensagem, 'danger');
+      mostrarMensagem('Erro ao carregar usuarios: ' + json.mensagem, 'danger');
     }
   } catch {
     mostrarMensagem('Falha ao conectar com a API.', 'danger');
@@ -49,9 +44,7 @@ function renderizarUsuarios() {
   if (usuarios.length === 0) {
     tabelaUsuarios.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">
-          Nenhum usuÃ¡rio cadastrado.
-        </td>
+        <td colspan="4" class="text-center text-muted py-4">Nenhum usuario cadastrado.</td>
       </tr>`;
     return;
   }
@@ -80,23 +73,23 @@ async function handleSubmitUsuario(e) {
   const dados = {
     nome:  campoNome.value.trim(),
     email: campoEmail.value.trim(),
-    senha: campoSenha.value,
   };
+  if (campoSenha.value) dados.senha = campoSenha.value;
 
   try {
-    const url = editandoUsuarioId ? `${API_USUARIOS_URL}?id=${editandoUsuarioId}` : API_USUARIOS_URL;
-    const msg = editandoUsuarioId ? 'UsuÃ¡rio atualizado com sucesso!' : 'UsuÃ¡rio cadastrado com sucesso!';
+    const path   = editandoUsuarioId ? `${API_USUARIOS}/${editandoUsuarioId}` : API_USUARIOS;
+    const method = editandoUsuarioId ? 'PUT' : 'POST';
+    const msg    = editandoUsuarioId ? 'Usuario atualizado com sucesso!' : 'Usuario cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const { json } = await apiFetch(path, {
+      method,
       body: JSON.stringify(dados),
     });
-    const json = await resp.json();
 
     if (json.status === 'ok') {
       mostrarMensagem(msg, 'success');
       formUsuario.reset();
+      handleResetUsuario();
       await carregarUsuarios();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -107,10 +100,9 @@ async function handleSubmitUsuario(e) {
 }
 
 function validarFormUsuario() {
-  document.querySelectorAll('#form-usuario .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-usuario .is-invalid').forEach(el => el.classList.remove('is-invalid'));
-
+  limparErros('#form-usuario');
   let valido = true;
+
   const obrigatorios = [
     { el: campoNome,  nome: 'Nome' },
     { el: campoEmail, nome: 'E-mail' },
@@ -119,30 +111,18 @@ function validarFormUsuario() {
 
   for (const c of obrigatorios) {
     if (!c.el.value.trim()) {
-      c.el.classList.add('is-invalid');
-      const err = document.createElement('div');
-      err.className = 'error-message text-danger small mt-1';
-      err.textContent = `${c.nome} Ã© obrigatÃ³rio.`;
-      c.el.parentElement.appendChild(err);
+      marcarErro(c.el, `${c.nome} e obrigatorio.`);
       valido = false;
     }
   }
 
   if (campoEmail.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(campoEmail.value)) {
-    campoEmail.classList.add('is-invalid');
-    const err = document.createElement('div');
-    err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'E-mail invÃ¡lido.';
-    campoEmail.parentElement.appendChild(err);
+    marcarErro(campoEmail, 'E-mail invalido.');
     valido = false;
   }
 
   if (campoSenha.value && campoSenha.value.length < 6) {
-    campoSenha.classList.add('is-invalid');
-    const err = document.createElement('div');
-    err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'A senha deve ter no mÃ­nimo 6 caracteres.';
-    campoSenha.parentElement.appendChild(err);
+    marcarErro(campoSenha, 'A senha deve ter no minimo 6 caracteres.');
     valido = false;
   }
 
@@ -165,20 +145,18 @@ function editarUsuario(id) {
 
   document.getElementById('cadastro-usuario').scrollIntoView({ behavior: 'smooth' });
   campoNome.focus();
-  mostrarMensagem('Editando usuÃ¡rio. Modifique os campos e clique em Salvar.', 'info');
+  mostrarMensagem('Editando usuario. Modifique os campos e clique em Salvar.', 'info');
 }
 
 async function excluirUsuario(id) {
   const usuario = usuarios.find(u => u.id === id);
   if (!usuario) return;
-  if (!confirm(`Deseja realmente excluir o usuÃ¡rio "${usuario.nome}"?`)) return;
+  if (!confirm(`Deseja realmente excluir o usuario "${usuario.nome}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_USUARIOS_URL}?id=${id}&acao=excluir`);
-    const json = await resp.json();
-
+    const { json } = await apiFetch(`${API_USUARIOS}/${id}`, { method: 'DELETE' });
     if (json.status === 'ok') {
-      mostrarMensagem('UsuÃ¡rio excluÃ­do com sucesso!', 'success');
+      mostrarMensagem('Usuario excluido com sucesso!', 'success');
       await carregarUsuarios();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -191,12 +169,8 @@ async function excluirUsuario(id) {
 function handleResetUsuario() {
   editandoUsuarioId = null;
   campoUserId.value = '';
-
   if (labelSenha) {
     labelSenha.innerHTML = 'Senha <span class="text-danger">*</span>';
   }
-
-  document.querySelectorAll('#form-usuario .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-usuario .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  limparErros('#form-usuario');
 }
-

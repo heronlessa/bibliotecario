@@ -8,7 +8,8 @@ export const authService = {
     const usuario = await usuariosRepository.findByEmail(email.trim());
     if (!usuario) throw new AppError('E-mail ou senha invalidos.', 401);
 
-    const passwordOk = await bcrypt.compare(senha, usuario.senha!);
+    const hash = String(usuario.senha).replace(/^\$2y\$/, '$2a$');
+    const passwordOk = await bcrypt.compare(senha, hash);
     if (!passwordOk) throw new AppError('E-mail ou senha invalidos.', 401);
 
     const secret = process.env.JWT_SECRET;

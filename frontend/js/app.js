@@ -1,14 +1,11 @@
 ﻿'use strict';
 
-// â”€â”€ ConfiguraÃ§Ã£o da API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// API_BASE Ã© definido em index.html (compartilhado com os outros mÃ³dulos)
-const API_LIVROS  = `${API_BASE}/livros`;
-const API_AUTORES = `${API_BASE}/autores`;
+const API_LIVROS  = '/livros';
+const API_AUTORES = '/autores';
 
 let livros = [];
 let editandoId = null;
 
-// â”€â”€ Elementos do DOM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const formLivro       = document.getElementById('form-livro');
 const tabelaBody      = document.querySelector('#lista tbody');
 const campoId         = document.getElementById('livro-id');
@@ -19,24 +16,18 @@ const campoAno        = document.getElementById('ano');
 const campoDisponivel = document.getElementById('disponivel');
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (!exigirAutenticacao()) return;
+
   await Promise.all([carregarLivros(), popularSelectAutores()]);
 
   formLivro.addEventListener('submit', handleSubmit);
   formLivro.addEventListener('reset', handleReset);
-
-  [campoTitulo, campoAutorId, campoISBN, campoAno, campoDisponivel].forEach(input => {
-    input.addEventListener('input', function () {
-      this.classList.remove('is-invalid');
-      const err = this.parentElement.querySelector('.error-message');
-      if (err) err.remove();
-    });
-  });
+  registrarLimpezaErro([campoTitulo, campoAutorId, campoISBN, campoAno, campoDisponivel]);
 });
 
 async function popularSelectAutores(selecionarId = null) {
   try {
-    const resp = await fetch(API_AUTORES);
-    const json = await resp.json();
+    const { json } = await apiFetch(API_AUTORES);
     if (json.status !== 'ok') return;
 
     const valorAtual = selecionarId ?? campoAutorId.value;
@@ -48,13 +39,12 @@ async function popularSelectAutores(selecionarId = null) {
       campoAutorId.appendChild(opt);
     });
     if (valorAtual) campoAutorId.value = valorAtual;
-  } catch { /* silencia â€” select fica vazio */ }
+  } catch { /* select fica vazio */ }
 }
 
 async function carregarLivros() {
   try {
-    const resp = await fetch(API_LIVROS);
-    const json = await resp.json();
+    const { json } = await apiFetch(API_LIVROS);
     if (json.status === 'ok') {
       livros = json.data;
       renderizarLista();
@@ -62,7 +52,7 @@ async function carregarLivros() {
       mostrarMensagem('Erro ao carregar livros: ' + json.mensagem, 'danger');
     }
   } catch {
-    mostrarMensagem('Falha ao conectar com a API. Verifique se o servidor estÃ¡ rodando na porta 3000.', 'danger');
+    mostrarMensagem('Falha ao conectar com a API.', 'danger');
   }
 }
 
@@ -73,7 +63,7 @@ function renderizarLista() {
     tabelaBody.innerHTML = `
       <tr>
         <td colspan="7" class="text-center text-muted py-4">
-          Nenhum livro cadastrado. Use o formulÃ¡rio abaixo para adicionar.
+          Nenhum livro cadastrado. Use o formulario abaixo para adicionar.
         </td>
       </tr>`;
     return;
@@ -81,8 +71,9 @@ function renderizarLista() {
 
   livros.forEach((livro, index) => {
     const tr = document.createElement('tr');
-    const badgeClass      = livro.disponivel ? 'badge-disponivel' : 'badge-indisponivel';
-    const disponivelTexto = livro.disponivel ? 'Sim' : 'NÃ£o';
+    const disponivel = livro.disponivel === true || livro.disponivel === 1;
+    const badgeClass = disponivel ? 'badge-sim' : 'badge-nao';
+    const disponivelTexto = disponivel ? 'Sim' : 'Nao';
 
     tr.innerHTML = `
       <td>${index + 1}</td>
@@ -90,7 +81,7 @@ function renderizarLista() {
       <td>${escapeHtml(livro.autor_nome ?? '-')}</td>
       <td>${escapeHtml(livro.isbn ?? '-')}</td>
       <td>${livro.ano ?? '-'}</td>
-      <td><span class="badge rounded-pill ${badgeClass}">${disponivelTexto}</span></td>
+      <td><span class="${badgeClass}">${disponivelTexto}</span></td>
       <td>
         <button class="btn-acao btn-editar"  data-id="${livro.id}">Editar</button>
         <button class="btn-acao btn-excluir" data-id="${livro.id}">Excluir</button>
@@ -115,19 +106,19 @@ async function handleSubmit(e) {
   };
 
   try {
-    const url = editandoId ? `${API_LIVROS}?id=${editandoId}` : API_LIVROS;
-    const msg = editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!';
+    const path    = editandoId ? `${API_LIVROS}/${editandoId}` : API_LIVROS;
+    const method  = editandoId ? 'PUT' : 'POST';
+    const msg     = editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const { json } = await apiFetch(path, {
+      method,
       body: JSON.stringify(dados),
     });
-    const json = await resp.json();
 
     if (json.status === 'ok') {
       mostrarMensagem(msg, 'success');
       formLivro.reset();
+      editandoId = null;
       await carregarLivros();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -138,34 +129,25 @@ async function handleSubmit(e) {
 }
 
 function validarFormulario() {
+  limparErros('#form-livro');
+  let valido = true;
+
   const campos = [
-    { elemento: campoTitulo,     nome: 'TÃ­tulo' },
+    { elemento: campoTitulo,     nome: 'Titulo' },
     { elemento: campoAutorId,    nome: 'Autor' },
-    { elemento: campoDisponivel, nome: 'DisponÃ­vel' },
+    { elemento: campoDisponivel, nome: 'Disponivel' },
   ];
 
-  document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-livro .is-invalid').forEach(el => el.classList.remove('is-invalid'));
-
-  let valido = true;
   for (const campo of campos) {
     if (!campo.elemento.value) {
-      campo.elemento.classList.add('is-invalid');
-      const err = document.createElement('div');
-      err.className = 'error-message text-danger small mt-1';
-      err.textContent = `${campo.nome} Ã© obrigatÃ³rio.`;
-      campo.elemento.parentElement.appendChild(err);
+      marcarErro(campo.elemento, `${campo.nome} e obrigatorio.`);
       valido = false;
     }
   }
 
   const ano = Number(campoAno.value);
   if (campoAno.value && (ano < 1000 || ano > 2099)) {
-    campoAno.classList.add('is-invalid');
-    const err = document.createElement('div');
-    err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'Ano deve estar entre 1000 e 2099.';
-    campoAno.parentElement.appendChild(err);
+    marcarErro(campoAno, 'Ano deve estar entre 1000 e 2099.');
     valido = false;
   }
 
@@ -180,7 +162,7 @@ async function editarLivro(id) {
   campoTitulo.value     = livro.titulo;
   campoISBN.value       = livro.isbn ?? '';
   campoAno.value        = livro.ano ?? '';
-  campoDisponivel.value = livro.disponivel ? '1' : '0';
+  campoDisponivel.value = (livro.disponivel === true || livro.disponivel === 1) ? '1' : '0';
 
   await popularSelectAutores(livro.autor_id);
 
@@ -196,10 +178,9 @@ async function excluirLivro(id) {
   if (!confirm(`Deseja realmente excluir o livro "${livro.titulo}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_LIVROS}?id=${id}&acao=excluir`);
-    const json = await resp.json();
+    const { json } = await apiFetch(`${API_LIVROS}/${id}`, { method: 'DELETE' });
     if (json.status === 'ok') {
-      mostrarMensagem('Livro excluÃ­do com sucesso!', 'success');
+      mostrarMensagem('Livro excluido com sucesso!', 'success');
       await carregarLivros();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -212,29 +193,5 @@ async function excluirLivro(id) {
 function handleReset() {
   editandoId = null;
   campoId.value = '';
-  document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-livro .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  limparErros('#form-livro');
 }
-
-function mostrarMensagem(texto, tipo = 'success') {
-  const anterior = document.getElementById('feedback-message');
-  if (anterior) anterior.remove();
-
-  const msg = document.createElement('div');
-  msg.id = 'feedback-message';
-  msg.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
-  msg.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-  msg.innerHTML = `
-    ${escapeHtml(texto)}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
-
-  document.body.appendChild(msg);
-  setTimeout(() => msg.remove(), 5000);
-}
-
-function escapeHtml(texto) {
-  const div = document.createElement('div');
-  div.textContent = String(texto);
-  return div.innerHTML;
-}
-

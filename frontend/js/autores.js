@@ -1,42 +1,32 @@
 'use strict';
 
-const API_AUTORES_URL = `${API_BASE}/autores`;
+const API_AUTORES = '/autores';
 
 let autores = [];
 let editandoAutorId = null;
 
-// ── Elementos do DOM ─────────────────────────────────────────────
-const formAutor      = document.getElementById('form-autor');
-const tabelaAutores  = document.querySelector('#autores-lista tbody');
+const formAutor          = document.getElementById('form-autor');
+const tabelaAutores      = document.querySelector('#autores-lista tbody');
 const campoAutorHiddenId = document.getElementById('autor-form-id');
-const campoAutorNome = document.getElementById('autor-nome');
-const campoAutorNac  = document.getElementById('autor-nacionalidade');
+const campoAutorNome     = document.getElementById('autor-nome');
+const campoAutorNac      = document.getElementById('autor-nacionalidade');
 
-// ── Inicialização ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  if (!exigirAutenticacao()) return;
+
   await carregarAutores();
 
   formAutor.addEventListener('submit', handleSubmitAutor);
   formAutor.addEventListener('reset',  handleResetAutor);
-
-  [campoAutorNome, campoAutorNac].forEach(input => {
-    input.addEventListener('input', function () {
-      this.classList.remove('is-invalid');
-      const err = this.parentElement.querySelector('.error-message');
-      if (err) err.remove();
-    });
-  });
+  registrarLimpezaErro([campoAutorNome, campoAutorNac]);
 });
 
-// ── Carregar autores ─────────────────────────────────────────────
 async function carregarAutores() {
   try {
-    const resp = await fetch(API_AUTORES_URL);
-    const json = await resp.json();
+    const { json } = await apiFetch(API_AUTORES);
     if (json.status === 'ok') {
       autores = json.data;
       renderizarAutores();
-      // Atualiza o select de autores no form de livros se existir
       if (typeof popularSelectAutores === 'function') popularSelectAutores();
     }
   } catch {
@@ -44,16 +34,13 @@ async function carregarAutores() {
   }
 }
 
-// ── Renderizar tabela ────────────────────────────────────────────
 function renderizarAutores() {
   tabelaAutores.innerHTML = '';
 
   if (autores.length === 0) {
     tabelaAutores.innerHTML = `
       <tr>
-        <td colspan="4" class="text-center text-muted py-4">
-          Nenhum autor cadastrado.
-        </td>
+        <td colspan="4" class="text-center text-muted py-4">Nenhum autor cadastrado.</td>
       </tr>`;
     return;
   }
@@ -75,19 +62,12 @@ function renderizarAutores() {
   });
 }
 
-// ── Submit ───────────────────────────────────────────────────────
 async function handleSubmitAutor(e) {
   e.preventDefault();
-
-  document.querySelectorAll('#form-autor .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-autor .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  limparErros('#form-autor');
 
   if (!campoAutorNome.value.trim()) {
-    campoAutorNome.classList.add('is-invalid');
-    const err = document.createElement('div');
-    err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'Nome é obrigatório.';
-    campoAutorNome.parentElement.appendChild(err);
+    marcarErro(campoAutorNome, 'Nome e obrigatorio.');
     return;
   }
 
@@ -97,19 +77,19 @@ async function handleSubmitAutor(e) {
   };
 
   try {
-    const url = editandoAutorId ? `${API_AUTORES_URL}?id=${editandoAutorId}` : API_AUTORES_URL;
-    const msg = editandoAutorId ? 'Autor atualizado com sucesso!' : 'Autor cadastrado com sucesso!';
+    const path   = editandoAutorId ? `${API_AUTORES}/${editandoAutorId}` : API_AUTORES;
+    const method = editandoAutorId ? 'PUT' : 'POST';
+    const msg    = editandoAutorId ? 'Autor atualizado com sucesso!' : 'Autor cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const { json } = await apiFetch(path, {
+      method,
       body: JSON.stringify(dados),
     });
-    const json = await resp.json();
 
     if (json.status === 'ok') {
       mostrarMensagem(msg, 'success');
       formAutor.reset();
+      editandoAutorId = null;
       await carregarAutores();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -119,7 +99,6 @@ async function handleSubmitAutor(e) {
   }
 }
 
-// ── Editar ───────────────────────────────────────────────────────
 function editarAutor(id) {
   const autor = autores.find(a => a.id === id);
   if (!autor) return;
@@ -134,18 +113,15 @@ function editarAutor(id) {
   mostrarMensagem('Editando autor. Modifique os campos e clique em Salvar.', 'info');
 }
 
-// ── Excluir ──────────────────────────────────────────────────────
 async function excluirAutor(id) {
   const autor = autores.find(a => a.id === id);
   if (!autor) return;
   if (!confirm(`Deseja realmente excluir o autor "${autor.nome}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_AUTORES_URL}?id=${id}&acao=excluir`);
-    const json = await resp.json();
-
+    const { json } = await apiFetch(`${API_AUTORES}/${id}`, { method: 'DELETE' });
     if (json.status === 'ok') {
-      mostrarMensagem('Autor excluído com sucesso!', 'success');
+      mostrarMensagem('Autor excluido com sucesso!', 'success');
       await carregarAutores();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -155,10 +131,8 @@ async function excluirAutor(id) {
   }
 }
 
-// ── Reset ────────────────────────────────────────────────────────
 function handleResetAutor() {
   editandoAutorId = null;
   campoAutorHiddenId.value = '';
-  document.querySelectorAll('#form-autor .error-message').forEach(el => el.remove());
-  document.querySelectorAll('#form-autor .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  limparErros('#form-autor');
 }

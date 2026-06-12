@@ -1,5 +1,6 @@
 backend/node_modules/
 backend/dist/
+backend/data/
 backend/.env
 *.log
 npm-debug.log*
