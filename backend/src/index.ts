@@ -17,6 +17,12 @@ const PORT = Number(process.env.PORT ?? 3000);
 app.use(cors());
 app.use(express.json());
 
+// Define charset UTF-8 para todas as respostas JSON
+app.use((req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
 app.use('/api/autores',     autoresRouter);
 app.use('/api/livros',      livrosRouter);
 app.use('/api/usuarios',    usuariosRouter);

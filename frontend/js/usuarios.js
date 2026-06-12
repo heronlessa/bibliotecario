@@ -30,13 +30,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function carregarUsuarios() {
   try {
-    const resp = await fetch(API_USUARIOS_URL);
+    const resp = await authFetch(API_USUARIOS_URL);
     const json = await resp.json();
     if (json.status === 'ok') {
       usuarios = json.data;
       renderizarUsuarios();
     } else {
-      mostrarMensagem('Erro ao carregar usuÃ¡rios: ' + json.mensagem, 'danger');
+      mostrarMensagem('Erro ao carregar usuarios: ' + json.mensagem, 'danger');
     }
   } catch {
     mostrarMensagem('Falha ao conectar com a API.', 'danger');
@@ -50,7 +50,7 @@ function renderizarUsuarios() {
     tabelaUsuarios.innerHTML = `
       <tr>
         <td colspan="4" class="text-center text-muted py-4">
-          Nenhum usuÃ¡rio cadastrado.
+          Nenhum usuario cadastrado.
         </td>
       </tr>`;
     return;
@@ -84,11 +84,12 @@ async function handleSubmitUsuario(e) {
   };
 
   try {
-    const url = editandoUsuarioId ? `${API_USUARIOS_URL}?id=${editandoUsuarioId}` : API_USUARIOS_URL;
-    const msg = editandoUsuarioId ? 'UsuÃ¡rio atualizado com sucesso!' : 'UsuÃ¡rio cadastrado com sucesso!';
+    const url    = editandoUsuarioId ? `${API_USUARIOS_URL}/${editandoUsuarioId}` : API_USUARIOS_URL;
+    const method = editandoUsuarioId ? 'PUT' : 'POST';
+    const msg    = editandoUsuarioId ? 'Usuário atualizado com sucesso!' : 'Usuário cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
+    const resp = await authFetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados),
     });
@@ -122,7 +123,7 @@ function validarFormUsuario() {
       c.el.classList.add('is-invalid');
       const err = document.createElement('div');
       err.className = 'error-message text-danger small mt-1';
-      err.textContent = `${c.nome} Ã© obrigatÃ³rio.`;
+      err.textContent = `${c.nome} é obrigatório.`;
       c.el.parentElement.appendChild(err);
       valido = false;
     }
@@ -132,7 +133,7 @@ function validarFormUsuario() {
     campoEmail.classList.add('is-invalid');
     const err = document.createElement('div');
     err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'E-mail invÃ¡lido.';
+    err.textContent = 'E-mail inválido.';
     campoEmail.parentElement.appendChild(err);
     valido = false;
   }
@@ -141,7 +142,7 @@ function validarFormUsuario() {
     campoSenha.classList.add('is-invalid');
     const err = document.createElement('div');
     err.className = 'error-message text-danger small mt-1';
-    err.textContent = 'A senha deve ter no mÃ­nimo 6 caracteres.';
+    err.textContent = 'A senha deve ter no mínimo 6 caracteres.';
     campoSenha.parentElement.appendChild(err);
     valido = false;
   }
@@ -165,20 +166,20 @@ function editarUsuario(id) {
 
   document.getElementById('cadastro-usuario').scrollIntoView({ behavior: 'smooth' });
   campoNome.focus();
-  mostrarMensagem('Editando usuÃ¡rio. Modifique os campos e clique em Salvar.', 'info');
+  mostrarMensagem('Editando usuario. Modifique os campos e clique em Salvar.', 'info');
 }
 
 async function excluirUsuario(id) {
   const usuario = usuarios.find(u => u.id === id);
   if (!usuario) return;
-  if (!confirm(`Deseja realmente excluir o usuÃ¡rio "${usuario.nome}"?`)) return;
+  if (!confirm(`Deseja realmente excluir o usuario "${usuario.nome}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_USUARIOS_URL}?id=${id}&acao=excluir`);
+    const resp = await authFetch(`${API_USUARIOS_URL}/${id}`, { method: 'DELETE' });
     const json = await resp.json();
 
     if (json.status === 'ok') {
-      mostrarMensagem('UsuÃ¡rio excluÃ­do com sucesso!', 'success');
+      mostrarMensagem('Usuario excluído com sucesso!', 'success');
       await carregarUsuarios();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');

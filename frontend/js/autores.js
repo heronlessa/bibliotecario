@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── Carregar autores ─────────────────────────────────────────────
 async function carregarAutores() {
   try {
-    const resp = await fetch(API_AUTORES_URL);
+    const resp = await authFetch(API_AUTORES_URL);
     const json = await resp.json();
     if (json.status === 'ok') {
       autores = json.data;
@@ -97,14 +97,16 @@ async function handleSubmitAutor(e) {
   };
 
   try {
-    const url = editandoAutorId ? `${API_AUTORES_URL}?id=${editandoAutorId}` : API_AUTORES_URL;
-    const msg = editandoAutorId ? 'Autor atualizado com sucesso!' : 'Autor cadastrado com sucesso!';
+    const url    = editandoAutorId ? `${API_AUTORES_URL}/${editandoAutorId}` : API_AUTORES_URL;
+    const method = editandoAutorId ? 'PUT' : 'POST';
+    const msg    = editandoAutorId ? 'Autor atualizado com sucesso!' : 'Autor cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
+    const resp = await authFetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados),
     });
+    
     const json = await resp.json();
 
     if (json.status === 'ok') {
@@ -141,7 +143,7 @@ async function excluirAutor(id) {
   if (!confirm(`Deseja realmente excluir o autor "${autor.nome}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_AUTORES_URL}?id=${id}&acao=excluir`);
+    const resp = await authFetch(`${API_AUTORES_URL}/${id}`, { method: 'DELETE' });
     const json = await resp.json();
 
     if (json.status === 'ok') {

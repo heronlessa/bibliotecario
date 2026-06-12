@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function popularSelectAutores(selecionarId = null) {
   try {
-    const resp = await fetch(API_AUTORES);
+    const resp = await authFetch(API_AUTORES);
     const json = await resp.json();
     if (json.status !== 'ok') return;
 
@@ -48,12 +48,12 @@ async function popularSelectAutores(selecionarId = null) {
       campoAutorId.appendChild(opt);
     });
     if (valorAtual) campoAutorId.value = valorAtual;
-  } catch { /* silencia â€” select fica vazio */ }
+  } catch { /* silencia -- select fica vazio */ }
 }
 
 async function carregarLivros() {
   try {
-    const resp = await fetch(API_LIVROS);
+    const resp = await authFetch(API_LIVROS);
     const json = await resp.json();
     if (json.status === 'ok') {
       livros = json.data;
@@ -62,7 +62,7 @@ async function carregarLivros() {
       mostrarMensagem('Erro ao carregar livros: ' + json.mensagem, 'danger');
     }
   } catch {
-    mostrarMensagem('Falha ao conectar com a API. Verifique se o servidor estÃ¡ rodando na porta 3000.', 'danger');
+    mostrarMensagem('Falha ao conectar com a API. Verifique se o servidor esta rodando na porta 3000.', 'danger');
   }
 }
 
@@ -73,7 +73,7 @@ function renderizarLista() {
     tabelaBody.innerHTML = `
       <tr>
         <td colspan="7" class="text-center text-muted py-4">
-          Nenhum livro cadastrado. Use o formulÃ¡rio abaixo para adicionar.
+          Nenhum livro cadastrado. Use o formulario abaixo para adicionar.
         </td>
       </tr>`;
     return;
@@ -82,7 +82,7 @@ function renderizarLista() {
   livros.forEach((livro, index) => {
     const tr = document.createElement('tr');
     const badgeClass      = livro.disponivel ? 'badge-disponivel' : 'badge-indisponivel';
-    const disponivelTexto = livro.disponivel ? 'Sim' : 'NÃ£o';
+    const disponivelTexto = livro.disponivel ? 'Sim' : 'Nao';
 
     tr.innerHTML = `
       <td>${index + 1}</td>
@@ -115,11 +115,12 @@ async function handleSubmit(e) {
   };
 
   try {
-    const url = editandoId ? `${API_LIVROS}?id=${editandoId}` : API_LIVROS;
-    const msg = editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!';
+    const url    = editandoId ? `${API_LIVROS}/${editandoId}` : API_LIVROS;
+    const method = editandoId ? 'PUT' : 'POST';
+    const msg    = editandoId ? 'Livro atualizado com sucesso!' : 'Livro cadastrado com sucesso!';
 
-    const resp = await fetch(url, {
-      method: 'POST',
+    const resp = await authFetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados),
     });
@@ -139,9 +140,9 @@ async function handleSubmit(e) {
 
 function validarFormulario() {
   const campos = [
-    { elemento: campoTitulo,     nome: 'TÃ­tulo' },
+    { elemento: campoTitulo,     nome: 'Titulo' },
     { elemento: campoAutorId,    nome: 'Autor' },
-    { elemento: campoDisponivel, nome: 'DisponÃ­vel' },
+    { elemento: campoDisponivel, nome: 'Disponivel' },
   ];
 
   document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
@@ -153,7 +154,7 @@ function validarFormulario() {
       campo.elemento.classList.add('is-invalid');
       const err = document.createElement('div');
       err.className = 'error-message text-danger small mt-1';
-      err.textContent = `${campo.nome} Ã© obrigatÃ³rio.`;
+      err.textContent = `${campo.nome} e obrigatorio.`;
       campo.elemento.parentElement.appendChild(err);
       valido = false;
     }
@@ -196,10 +197,10 @@ async function excluirLivro(id) {
   if (!confirm(`Deseja realmente excluir o livro "${livro.titulo}"?`)) return;
 
   try {
-    const resp = await fetch(`${API_LIVROS}?id=${id}&acao=excluir`);
+    const resp = await authFetch(`${API_LIVROS}/${id}`, { method: 'DELETE' });
     const json = await resp.json();
     if (json.status === 'ok') {
-      mostrarMensagem('Livro excluÃ­do com sucesso!', 'success');
+      mostrarMensagem('Livro excluido com sucesso!', 'success');
       await carregarLivros();
     } else {
       mostrarMensagem('Erro: ' + json.mensagem, 'danger');
@@ -214,27 +215,5 @@ function handleReset() {
   campoId.value = '';
   document.querySelectorAll('#form-livro .error-message').forEach(el => el.remove());
   document.querySelectorAll('#form-livro .is-invalid').forEach(el => el.classList.remove('is-invalid'));
-}
-
-function mostrarMensagem(texto, tipo = 'success') {
-  const anterior = document.getElementById('feedback-message');
-  if (anterior) anterior.remove();
-
-  const msg = document.createElement('div');
-  msg.id = 'feedback-message';
-  msg.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
-  msg.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-  msg.innerHTML = `
-    ${escapeHtml(texto)}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
-
-  document.body.appendChild(msg);
-  setTimeout(() => msg.remove(), 5000);
-}
-
-function escapeHtml(texto) {
-  const div = document.createElement('div');
-  div.textContent = String(texto);
-  return div.innerHTML;
 }
 
