@@ -2,10 +2,6 @@
 
 Disciplina: [Desenvolvimento Full Stack](https://pucpr.instructure.com/courses/51253)
 
-Autor(es): Grupo — insira nomes dos integrantes e link do repositório GitHub.
-
-Data: 2026
-
 ---
 
 ## Visão Geral
@@ -235,5 +231,3 @@ Erro de validação (exemplo):
 - Professor: Prof. Giulio Domenico Bordin
 
 ---
-
-Se quiser, eu posso também: 1) commitar o arquivo e fazer push para o repositório; 2) gerar slides com trechos de código; 3) adicionar um `README-pt-br` mais resumido para a apresentação. Diga qual opção prefere.
